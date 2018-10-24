@@ -20,8 +20,8 @@ echo version \'$version\'
 #######################################################"
 echo "Installing Couchbase Server..."
 
-wget https://packages.couchbase.com/releases/${version}/couchbase-server-enterprise-${version}-centos6.x86_64.rpm
-rpm --install couchbase-server-enterprise-${version}-centos6.x86_64.rpm
+wget https://packages.couchbase.com/releases/${version}/couchbase-server-community-${version}-ubuntu16.04_amd64.rpm
+rpm --install couchbase-server-community-${version}-ubuntu16.04_amd64.rpm
 
 #######################################################"
 ############ Turn Off Transparent Hugepages ###########"
