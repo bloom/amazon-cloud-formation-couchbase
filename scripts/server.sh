@@ -20,8 +20,10 @@ echo version \'$version\'
 #######################################################"
 echo "Installing Couchbase Server..."
 
-wget https://packages.couchbase.com/releases/${version}/couchbase-server-community-${version}-ubuntu16.04_amd64.rpm
-rpm --install couchbase-server-community-${version}-ubuntu16.04_amd64.rpm
+curl -O http://packages.couchbase.com/releases/couchbase-release/couchbase-release-1.0-4-amd64.deb
+sudo dpkg -i couchbase-release-1.0-4-amd64.deb
+sudo apt-get update
+sudo apt-get install -y couchbase-server-community
 
 #######################################################"
 ############ Turn Off Transparent Hugepages ###########"
@@ -60,8 +62,7 @@ vm.swappiness = 0
 source util.sh
 formatDataDisk
 
-yum -y update
-yum -y install jq
+apt-get -y install jq
 
 if [ -z "$6" ]
 then
