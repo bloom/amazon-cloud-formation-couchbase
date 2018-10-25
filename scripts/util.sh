@@ -2,7 +2,7 @@
 
 formatDataDisk ()
 {
-  DEVICE=/dev/sdk
+  DEVICE=/dev/xvdk
   MOUNTPOINT=/mnt/datadisk
 
   echo "Creating the filesystem."
