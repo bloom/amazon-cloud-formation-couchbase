@@ -45,8 +45,8 @@ echo 'never' > /sys/kernel/mm/transparent_hugepage/enabled
 echo 'never' > /sys/kernel/mm/transparent_hugepage/defrag
 " > /etc/init.d/disable-thp
 chmod 755 /etc/init.d/disable-thp
-service disable-thp start
-chkconfig disable-thp on
+/etc/init.d/disable-thp start
+update-rc.d disable-thp defaults
 
 #######################################################
 ################# Set Swappiness to 0 #################
