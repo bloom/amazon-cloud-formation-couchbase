@@ -4,16 +4,12 @@ echo "Running server.sh"
 
 adminUsername=$1
 adminPassword=$2
-services=$3
 stackName=$4
-version=$5
 
 echo "Got the parameters:"
 echo adminUsername \'$adminUsername\'
 echo adminPassword \'$adminPassword\'
-echo services \'$services\'
 echo stackName \'$stackName\'
-echo version \'$version\'
 
 #######################################################"
 ############## Install Couchbase Server ###############"
@@ -23,7 +19,7 @@ echo "Installing Couchbase Server..."
 curl -O http://packages.couchbase.com/releases/couchbase-release/couchbase-release-1.0-4-amd64.deb
 dpkg -i couchbase-release-1.0-4-amd64.deb
 apt-get update
-apt-get install -y couchbase-server-community
+apt install ./couchbase-server.deb
 apt-get install -y awscli
 
 #######################################################"
@@ -68,12 +64,12 @@ apt-get -y install jq
 if [ -z "$6" ]
 then
   echo "This node is part of the autoscaling group that contains the rally point."
-  rallyPublicDNS=`getRallyPublicDNS`
+  rallyPrivateIP=`getRallyPrivateIP`
 else
   rallyAutoScalingGroup=$6
   echo "This node is not the rally point and not part of the autoscaling group that contains the rally point."
   echo rallyAutoScalingGroup \'$rallyAutoScalingGroup\'
-  rallyPublicDNS=`getRallyPublicDNS ${rallyAutoScalingGroup}`
+  rallyPrivateIP=`getRallyPrivateIP ${rallyAutoScalingGroup}`
 fi
 
 region=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document \
@@ -84,19 +80,18 @@ instanceID=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/doc
   | jq '.instanceId' \
   | sed 's/^"\(.*\)"$/\1/' )
 
-nodePublicDNS=`curl http://169.254.169.254/latest/meta-data/public-hostname`
+nodePrivateIP=`curl http://169.254.169.254/latest/meta-data/local-ipv4`
 
 echo "Using the settings:"
 echo adminUsername \'$adminUsername\'
 echo adminPassword \'$adminPassword\'
-echo services \'$services\'
 echo stackName \'$stackName\'
-echo rallyPublicDNS \'$rallyPublicDNS\'
+echo rallyPrivateIP \'$rallyPrivateIP\'
 echo region \'$region\'
 echo instanceID \'$instanceID\'
-echo nodePublicDNS \'$nodePublicDNS\'
+echo nodePrivateIP \'$nodePrivateIP\'
 
-if [[ ${rallyPublicDNS} == ${nodePublicDNS} ]]
+if [[ ${rallyPrivateIP} == ${nodePrivateIP} ]]
 then
   aws ec2 create-tags \
     --region ${region} \
@@ -116,42 +111,46 @@ output=""
 while [[ ! $output =~ "SUCCESS" ]]
 do
   output=`./couchbase-cli node-init \
-    --cluster=$nodePublicDNS \
-    --node-init-hostname=$nodePublicDNS \
+    --cluster=$nodePrivateIP \
+    --node-init-hostname=$nodePrivateIP \
     --node-init-data-path=/mnt/datadisk/data \
     --node-init-index-path=/mnt/datadisk/index \
+    --node-init-analytics-path=/mnt/datadisk/analytics \
     --user=$adminUsername \
     --pass=$adminPassword`
   echo node-init output \'$output\'
   sleep 10
 done
 
-if [[ $rallyPublicDNS == $nodePublicDNS ]]
+if [[ $rallyPrivateIP == $nodePrivateIP ]]
 then
   totalRAM=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-  dataRAM=$((65 * $totalRAM / 100000))
-  indexRAM=$((20 * $totalRAM / 100000))
+  dataRAM=$((60 * $totalRAM / 100000))
+  indexRAM=$((15 * $totalRAM / 100000))
+  analyticsRAM=$((10 * $totalRAM / 100000))
 
   echo "Running couchbase-cli cluster-init"
   ./couchbase-cli cluster-init \
-    --cluster=$nodePublicDNS \
+    --cluster=$nodePrivateIP \
     --cluster-username=$adminUsername \
     --cluster-password=$adminPassword \
     --cluster-ramsize=$dataRAM \
-    --services=index,data,query
+    --cluster-index-ramsize=$indexRAM \
+    --cluster-analytics-ramsize=$analyticsRAM \
+    --services=index,data,query,analytics
 else
   echo "Running couchbase-cli server-add"
   output=""
-  while [[ $output != "Server $nodePublicDNS:8091 added" && ! $output =~ "Node is already part of cluster." ]]
+  while [[ $output != "Server $nodePrivateIP:8091 added" && ! $output =~ "Node is already part of cluster." ]]
   do
     output=`./couchbase-cli server-add \
-      --cluster=$rallyPublicDNS \
+      --cluster=$rallyPrivateIP \
       --user=$adminUsername \
       --pass=$adminPassword \
-      --server-add=$nodePublicDNS \
+      --server-add=$nodePrivateIP \
       --server-add-username=$adminUsername \
       --server-add-password=$adminPassword \
-      --services=${services}`
+      --services=index,data,query,analytics
     echo server-add output \'$output\'
     sleep 10
   done
@@ -161,7 +160,7 @@ else
   while [[ ! $output =~ "SUCCESS" ]]
   do
     output=`./couchbase-cli rebalance \
-    --cluster=$rallyPublicDNS \
+    --cluster=$rallyPrivateIP \
     --user=$adminUsername \
     --pass=$adminPassword`
     echo rebalance output \'$output\'

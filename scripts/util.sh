@@ -21,7 +21,7 @@ formatDataDisk ()
   chgrp couchbase $MOUNTPOINT
 }
 
-getRallyPublicDNS ()
+getRallyPrivateIP ()
 {
   region=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document \
     | jq '.region'  \
@@ -62,11 +62,11 @@ getRallyPublicDNS ()
     fi
   done
 
-  rallyPublicDNS=$(aws ec2 describe-instances \
+  rallyPrivateIP=$(aws ec2 describe-instances \
     --region ${region} \
-    --query  'Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicDnsName' \
+    --query  'Reservations[0].Instances[0].NetworkInterfaces[0].Addresses.PrivateIpAddress' \
     --instance-ids ${rallyInstanceID} \
     --output text)
 
-  echo ${rallyPublicDNS}
+  echo ${rallyPrivateIP}
 }

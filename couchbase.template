@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Couchbase Community on Ubuntu
+Parameters:
+  ServerInstanceCount:
+    Description: Number of Couchbase Server Nodes
+    Type: Number
+    Default: 3
+  ServerDiskSize:
+    Description: Size in GB of the EBS gp2 volume on each Couchbase node
+    Type: Number
+    Default: 1500
+  ServerVersion:
+    Description: Couchbase Server Version
+    Type: String
+    Default: 6.0.0
+    AllowedValues:
+      - 6.0.0
+  InstanceType:
+    Description: Instance type for Couchbase Nodes
+    Type: String
+    Default: r4.4xlarge
+  Username:
+    Description: Username for Couchbase administrator
+    Type: String
+  Password:
+    Description: Password for Couchbase administrator
+    Type: String
+    NoEcho: true
+  KeyName:
+    Description: Name of an existing EC2 KeyPair
+    Type: 'AWS::EC2::KeyPair::KeyName'
+Resources:
+  ServerAutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      AvailabilityZones: !GetAZs ''
+      LaunchConfigurationName: !Ref ServerLaunchConfiguration
+      MinSize: 1
+      MaxSize: 100
+      DesiredCapacity: !Ref ServerInstanceCount
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: e89ebc1a-4e32-48b4-9859-76d540010951
+  ServerLaunchConfiguration:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      ImageId: ami-0735ea082a1534cac
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - sg-4934e12d
+      KeyName: !Ref KeyName
+      EbsOptimized: true
+      IamInstanceProfile: !Ref CouchbaseInstanceProfile
+      BlockDeviceMappings:
+        # - DeviceName: /dev/xvda
+        #   Ebs:
+        #     VolumeSize: 8
+        #     VolumeType: gp2
+        #     DeleteOnTermination: true
+        - DeviceName: /dev/sdk
+          Ebs:
+            VolumeSize: !Ref ServerDiskSize
+            VolumeType: gp2
+            Encrypted: true
+      UserData: !Base64
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash
+            - |
+              echo 'Running startup script...'
+            - adminUsername=
+            - !Ref Username
+            - |+
+
+            - adminPassword=
+            - !Ref Password
+            - |+
+
+            - |
+              services=data
+            - stackName=
+            - !Ref 'AWS::StackName'
+            - |+
+
+            - serverVersion=
+            - !Ref ServerVersion
+            - |+
+
+            - >
+              baseURL=https://raw.githubusercontent.com/bloom/amazon-cloud-formation-couchbase/master/scripts/
+            - |
+              wget ${baseURL}server.sh
+            - |
+              wget ${baseURL}util.sh
+            - |
+              chmod +x *.sh
+            - >
+              ./server.sh ${adminUsername} ${adminPassword} ${services}
+              ${stackName} ${serverVersion}
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d58b7972-0071-4235-8756-d9bcd7ec1cf7
+  CouchbaseInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Roles:
+        - !Ref CouchbaseRole
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 392b1ec5-8035-4736-ad75-f856ad3e4353
+  CouchbaseRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: CouchbasePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateTags'
+                  - 'ec2:DescribeTags'
+                  - 'ec2:DescribeInstances'
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                Resource: '*'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 8daabcb4-f94a-48c2-9a62-f28c75a5b6e8
+  CouchbaseSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH and Couchbase Ports
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 4369
+          ToPort: 4369
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 4984
+          ToPort: 4985
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8091
+          ToPort: 8096
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9100
+          ToPort: 9105
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9110
+          ToPort: 9122
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9998
+          ToPort: 9999
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 11207
+          ToPort: 11215
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 18091
+          ToPort: 18096
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 21100
+          ToPort: 21299
+          CidrIp: 0.0.0.0/0
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 38a37f43-eb96-4319-8289-8f114a1540dc
+Metadata:
+  'AWS::CloudFormation::Designer':
+    38a37f43-eb96-4319-8289-8f114a1540dc:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 300
+        'y': 210
+      z: 1
+      embeds: []
+    8daabcb4-f94a-48c2-9a62-f28c75a5b6e8:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 60
+        'y': 110
+      z: 1
+      embeds: []
+    392b1ec5-8035-4736-ad75-f856ad3e4353:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 60
+        'y': 210
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 8daabcb4-f94a-48c2-9a62-f28c75a5b6e8
+    d58b7972-0071-4235-8756-d9bcd7ec1cf7:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        'y': 210
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 38a37f43-eb96-4319-8289-8f114a1540dc
+    e89ebc1a-4e32-48b4-9859-76d540010951:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        'y': 320
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - d58b7972-0071-4235-8756-d9bcd7ec1cf7
