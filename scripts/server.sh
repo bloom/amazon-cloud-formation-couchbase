@@ -60,16 +60,8 @@ formatDataDisk
 
 apt-get -y install jq
 
-if [ -z "$6" ]
-then
-  echo "This node is part of the autoscaling group that contains the rally point."
-  rallyPrivateIP=`getRallyPrivateIP`
-else
-  rallyAutoScalingGroup=$6
-  echo "This node is not the rally point and not part of the autoscaling group that contains the rally point."
-  echo rallyAutoScalingGroup \'$rallyAutoScalingGroup\'
-  rallyPrivateIP=`getRallyPrivateIP ${rallyAutoScalingGroup}`
-fi
+echo "This node is part of the autoscaling group that contains the rally point."
+rallyPrivateIP=`getRallyPrivateIP`
 
 region=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document \
   | jq '.region'  \
@@ -114,7 +106,6 @@ do
     --node-init-hostname=$nodePrivateIP \
     --node-init-data-path=/mnt/datadisk/data \
     --node-init-index-path=/mnt/datadisk/index \
-    --node-init-analytics-path=/mnt/datadisk/analytics \
     --user=$adminUsername \
     --pass=$adminPassword`
   echo node-init output \'$output\'
@@ -125,8 +116,7 @@ if [[ $rallyPrivateIP == $nodePrivateIP ]]
 then
   totalRAM=$(grep MemTotal /proc/meminfo | awk '{print $2}')
   dataRAM=$((60 * $totalRAM / 100000))
-  indexRAM=$((15 * $totalRAM / 100000))
-  analyticsRAM=$((10 * $totalRAM / 100000))
+  indexRAM=$((20 * $totalRAM / 100000))
 
   echo "Running couchbase-cli cluster-init"
   ./couchbase-cli cluster-init \
@@ -135,21 +125,20 @@ then
     --cluster-password=$adminPassword \
     --cluster-ramsize=$dataRAM \
     --cluster-index-ramsize=$indexRAM \
-    --cluster-analytics-ramsize=$analyticsRAM \
-    --services=index,data,query,analytics
+    --services=index,data,query
 else
   echo "Running couchbase-cli server-add"
   output=""
   while [[ $output != "Server $nodePrivateIP:8091 added" && ! $output =~ "Node is already part of cluster." ]]
   do
-    output=`./couchbase-cli server-add \
+    output=$(./couchbase-cli server-add \
       --cluster=$rallyPrivateIP \
       --user=$adminUsername \
       --pass=$adminPassword \
       --server-add=$nodePrivateIP \
       --server-add-username=$adminUsername \
       --server-add-password=$adminPassword \
-      --services=index,data,query,analytics
+      --services=index,data,query)
     echo server-add output \'$output\'
     sleep 10
   done
@@ -158,10 +147,10 @@ else
   output=""
   while [[ ! $output =~ "SUCCESS" ]]
   do
-    output=`./couchbase-cli rebalance \
+    output=$(./couchbase-cli rebalance \
     --cluster=$rallyPrivateIP \
     --user=$adminUsername \
-    --pass=$adminPassword`
+    --pass=$adminPassword)
     echo rebalance output \'$output\'
     sleep 10
   done
