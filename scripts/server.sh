@@ -19,8 +19,7 @@ echo "Installing Couchbase Server..."
 curl -O http://packages.couchbase.com/releases/couchbase-release/couchbase-release-1.0-4-amd64.deb
 dpkg -i couchbase-release-1.0-4-amd64.deb
 apt-get update
-apt install ./couchbase-server.deb
-apt-get install -y awscli
+apt-get install -y awscli couchbase-server-community
 
 #######################################################"
 ############ Turn Off Transparent Hugepages ###########"
