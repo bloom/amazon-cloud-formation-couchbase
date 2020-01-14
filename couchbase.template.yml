@@ -9,12 +9,6 @@ Parameters:
     Description: Size in GB of the EBS gp2 volume on each Couchbase node
     Type: Number
     Default: 1500
-  ServerVersion:
-    Description: Couchbase Server Version
-    Type: String
-    Default: 6.0.0
-    AllowedValues:
-      - 6.0.0
   InstanceType:
     Description: Instance type for Couchbase Nodes
     Type: String
@@ -83,10 +77,6 @@ Resources:
             - !Ref 'AWS::StackName'
             - |+
 
-            - serverVersion=
-            - !Ref ServerVersion
-            - |+
-
             - >
               baseURL=https://raw.githubusercontent.com/bloom/amazon-cloud-formation-couchbase/master/scripts/
             - |
@@ -97,7 +87,7 @@ Resources:
               chmod +x *.sh
             - >
               ./server.sh ${adminUsername} ${adminPassword} ${services}
-              ${stackName} ${serverVersion}
+              ${stackName}
     Metadata:
       'AWS::CloudFormation::Designer':
         id: d58b7972-0071-4235-8756-d9bcd7ec1cf7
